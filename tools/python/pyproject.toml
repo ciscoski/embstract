@@ -1,0 +1,23 @@
+[project]
+name="embstrato-tooling"
+dynamic = ["version"]
+description = "All python scripts needed by the project."
+license = {file = "LICENSE"}
+dependencies = [
+    "mkdocs",
+    "mkdocs-same-dir",
+    "pymdown-extensions",
+    "regex",
+    "pyaml"
+]
+requires-python = ">= 3.12"
+
+
+[tool.setuptools.packages.find]
+where = ["../../tools"]
+include = ["linting.clang", "linting.pclint"]
+
+[project.scripts]
+run-clang-format="linting.clang.run_clang_format:main"
+run-clang-tidy="linting.clang.run_clang_tidy:main"
+run-pclint="linting.pclint.run_pclint:main"

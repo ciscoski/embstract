@@ -1,0 +1,30 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 25,
+    "patch": 0
+  },
+  "include": [
+    "tools/build_env/cmake/toolchains/toolchain-presets.json",
+    "tools/build_env/cmake/scripts/emstracto-presets.json"
+  ],
+  "configurePresets": [
+    {
+      "name": "Ciscoski",
+      "cacheVariables": {
+        "TARGET": "hello_world"
+      },
+      "inherits": [
+        "release",
+        "gcc-host"
+      ],
+      "generator": "Ninja",
+      "vendor": {
+        "microsoft.com/VisualStudioSettings/CMake/1.0": {
+          "intelliSenseMode": "linux-gcc-arm"
+        }
+      }
+    }
+  ]
+}

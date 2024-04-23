@@ -1,0 +1,25 @@
++ffn // force full path names
+-width=0 // don't insert line breaks (unlimited output width)
+-hB3
+-format="%(%f:%l:%C: %)%t %n: %m"
+
+// Treat headers from the external folder as library headers
++libdir(*/external/*)
+
+// Enable MISRA checks
+au-misra3.lnt
+au-misra3-amd1.lnt
+au-misra3-amd2.lnt
+
+// Don't apply MISRA checks to library code
+-wlib(4)
+-wlib(1)
+
+// Choose number of analysis threads automatically
+-max_threads=0
+
+// Use return code to indicate the number of lint messages generated
+-frz
+
+// Print summary of messages at the end of the report
+-summary

@@ -1,0 +1,34 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 25,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "debug",
+            "description": "Debug build type",
+            "hidden": true,
+            "environment": {
+                "EMBSTRACTO_BUILD_TYPE": "debug"
+            },
+            "cacheVariables":
+            {
+                "CMAKE_BUILD_TYPE": "debug"
+            }
+        },
+        {
+            "name": "release",
+            "description": "Release build type",
+            "hidden": true,
+            "environment": {
+                "EMBSTRACTO_BUILD_TYPE": "rel"
+            },
+            "cacheVariables":
+            {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        }
+    ]
+}

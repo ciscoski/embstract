@@ -1,0 +1,5 @@
+// Allow repeated includes - using include guards
+-e537
+
+// In debug mode infinite loops are used to fail fast.
+-header(injection.h)

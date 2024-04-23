@@ -1,0 +1,53 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 25,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "source-dir",
+            "description": "Source directory",
+            "binaryDir": "${sourceDir}/build/${presetName}/$env{EMBSTRACTO_TOOLCHAIN}/$env{EMBSTRACTO_BUILD_TYPE}/",
+            "hidden": true,
+            "environment": {
+                "EMBSTRACTO_SOURCE_DIR": "${sourceDir}"
+            }
+        },
+        {
+            "name": "export-compile-db",
+            "description": "Export Compile Database",
+            "hidden": true,
+            "cacheVariables": {
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+            }
+        },
+        {
+            "name": "gcc-arm-none-eabi",
+            "description": "Use arm-none-eabi gcc toolchain",
+            "hidden": true,
+            "inherits": [
+                "source-dir",
+                "export-compile-db"
+            ],
+            "toolchainFile": "${sourceDir}/tools/build_env/cmake/toolchains/gcc-arm-none-eabi.cmake",
+            "environment": {
+                "EMBSTRACTO_TOOLCHAIN": "gnu-arm-none-eabi"
+            }
+        },
+        {
+            "name": "gcc-host",
+            "description": "Use host gcc toolchain",
+            "hidden": true,
+            "inherits": [
+                "source-dir",
+                "export-compile-db"
+            ],
+            "toolchainFile": "${sourceDir}/tools/build_env/cmake/toolchains/gcc-host.cmake",
+            "environment": {
+                "EMBSTRACTO_TOOLCHAIN": "gcc-host"
+            }
+        }
+    ]
+}
