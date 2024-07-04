@@ -1,2 +1,8 @@
+-i"%PCLINT_TOOLING_PATH%"
+-i"%PCLINT_LNT_PATH%"
+
 options.lnt
 suppressions.lnt
+
+%PCLINT_COMPILER_FILE_PATH%
+%PCLINT_PROJECT_FILE_PATH%

@@ -21,7 +21,7 @@ import sys
 import tempfile
 import mmap
 from dataclasses import dataclass
-from typing import Pattern
+from typing import Pattern, Tuple
 import glob
 import logging
 from pprint import pformat
@@ -157,7 +157,7 @@ def build_pclint_project_configuration(
     build_path: str,
     pclint_output_path: str,
     pcpl_config_path: str,
-) -> str:
+) -> Tuple[str, str | None]:
 
     logging.debug("Project configuration")
     project_config_file_path = os.path.join(
@@ -168,6 +168,7 @@ def build_pclint_project_configuration(
     )
 
     if project_files is not None:
+        temporary_file = True
         # generates a temporary compile_command file because somehow
         # --source-pattern does not work in pclp_config.py
         filter = re.compile("|".join([re.escape(x) for x in project_files]))
@@ -181,7 +182,8 @@ def build_pclint_project_configuration(
                 json.dump(filtered_commands, command_filter_file)
                 compile_command_file_path_temp = command_filter_file.name
     else:
-        compile_command_file_path_temp = compile_command_file
+        temporary_file = False
+        compile_command_file_path_temp = compile_command_file_path
 
     subprocess.run(
         [
@@ -205,11 +207,11 @@ def build_pclint_project_configuration(
     return project_config_file_path
 
 
-def execute_pclint(pclint_path: str, args: list[str]):
+def execute_pclint(pclint_path: str, args: list[str], env: dict):
     pcpl64_path = os.path.abspath(os.path.join(pclint_path, PCLINT_LINTER_EXECUTABLE))
     cmd = [pcpl64_path, *args]
     logging.debug("invoking: \n%s", pformat(cmd))
-    r = subprocess.run(cmd, shell=True)
+    r = subprocess.run(cmd, shell=True, env=env)
     return r.returncode
 
 
@@ -218,7 +220,11 @@ def main():
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
-        "files", nargs="*", type=abs_file_path, help="File paths to analyse."
+        "-f",
+        "--files",
+        action="append",
+        type=abs_file_path,
+        help="File paths to analyse.",
     )
     parser.add_argument(
         "--build-path",
@@ -226,6 +232,7 @@ def main():
         type=abs_dir_path,
         help="Path to a folder containg a compile command database.",
     )
+
     parser.add_argument(
         "--pclint-path",
         required=False,
@@ -235,21 +242,6 @@ def main():
     )
 
     parser.add_argument(
-        "--pclint-pre-args",
-        action="append",
-        required=False,
-        default=[],
-        help="Supplementary arguments for PC-Lint. These are set before the compiler and project file.",
-    )
-
-    parser.add_argument(
-        "--pclint-post-args",
-        action="append",
-        required=False,
-        default=[],
-        help="Supplementary arguments for PC-Lint. These are set after the compiler and project file.",
-    )
-    parser.add_argument(
         "-l",
         "--log-level",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
@@ -257,28 +249,31 @@ def main():
         default="INFO",
     )
 
-    args = parser.parse_args()
+    # parse arguments,
+    args, pclp_arguments = parser.parse_known_args()
 
+    # setup logging
     logging.basicConfig(level=getattr(logging, args.log_level))
 
-    pclint_path = args.pclint_path
-
+    # Find path for PCLint config script
     pcpl_config_path = os.path.abspath(
-        os.path.join(pclint_path, PCLINT_CONFIG_SCRIPT_RELATIVE_PATH)
+        os.path.join(args.pclint_path, PCLINT_CONFIG_SCRIPT_RELATIVE_PATH)
     )
     if not os.path.isfile(pcpl_config_path):
-        raise FileNotFoundError(f"Could not find pcpl_config in {pclint_path}")
+        raise FileNotFoundError(f"Could not find pcpl_config in {args.pclint_path}")
 
+    # Create PCLint confguration output folder
     pclint_output_path = os.path.join(args.build_path, PCLINT_OUTPUT_PATH)
     if not os.path.exists(pclint_output_path):
         os.mkdir(pclint_output_path)
 
+    # extract compiler configuration
     compiler_configuration = extact_compiler_name_from_build(args.build_path)
-
     compiler_config_file_path = build_pclint_compiler_configuration(
         compiler_configuration, pclint_output_path, pcpl_config_path
     )
 
+    # extract project configuration
     project_config_file_path = build_pclint_project_configuration(
         args.files,
         compiler_configuration["compiler"].value,
@@ -288,20 +283,18 @@ def main():
     )
 
     pclint_tooling_path = os.path.dirname(os.path.realpath(__file__))
-    pclint_lnt_path = os.path.abspath(os.path.join(pclint_path, "lnt"))
+    pclint_lnt_path = os.path.abspath(os.path.join(args.pclint_path, "lnt"))
+
+    env = os.environ.copy()
+    env["PCLINT_LNT_PATH"] = pclint_lnt_path
+    env["PCLINT_TOOLING_PATH"] = pclint_tooling_path
+    env["PCLINT_COMPILER_FILE_PATH"] = compiler_config_file_path
+    env["PCLINT_PROJECT_FILE_PATH"] = project_config_file_path
 
     logging.debug("Linting")
-    return execute_pclint(
-        args.pclint_path,
-        [
-            f"-i{pclint_lnt_path}",
-            f"-i{pclint_tooling_path}",
-            *args.pclint_pre_args,
-            compiler_config_file_path,
-            project_config_file_path,
-            *args.pclint_post_args,
-        ],
-    )
+    exec_return = execute_pclint(args.pclint_path, pclp_arguments, env)
+
+    return exec_return
 
 
 if __name__ == "__main__":
