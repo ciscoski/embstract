@@ -20,6 +20,3 @@ au-misra3-amd2.lnt
 
 // Use return code to indicate the number of lint messages generated
 -frz
-
-// Print summary of messages at the end of the report
--summary

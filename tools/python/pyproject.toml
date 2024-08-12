@@ -8,7 +8,8 @@ dependencies = [
     "mkdocs-same-dir",
     "pymdown-extensions",
     "regex",
-    "pyaml"
+    "pyaml",
+    "watchdog"
 ]
 requires-python = ">= 3.12"
 
@@ -20,4 +21,4 @@ include = ["linting.clang","formatting.clang", "linting.pclint"]
 [project.scripts]
 run-clang-format="formatting.clang.run_clang_format:main"
 run-clang-tidy="linting.clang.run_clang_tidy:main"
-run-pclint="linting.pclint.run_pclint:main"
+run-pclint="linting.pclint.run_pclint:cli"
