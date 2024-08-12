@@ -25,21 +25,47 @@
             {
                 "label": "pclint",
                 "type": "shell",
-                "command": "run-pclint --build-path ${command:cmake.buildDirectory} ./tools/linting/pclint/std.lnt",
+                "command": "run-pclint --build-path ${command:cmake.buildDirectory} watch ./tools/linting/pclint/std.lnt",
+                "isBackground": true,
                 "group": "none",
-                "problemMatcher":{
+                "problemMatcher": [
+                    {
+                        "source": "pclint",
+                        "owner": "cpp",
+                        "fileLocation": "absolute",
+                        "severity": "info",
+                        "pattern": {
+                            "regexp": "^(.*):(\\d+):(\\d+):\\s+(info|note|supplemental)\\s+(.*)$",
+                            "file": 1,
+                            "line": 2,
+                            "column": 3,
+                            "message": 5
+                        },
+                        "background": {
+                            "activeOnStart": true,
+                            "beginsPattern": "File change detected: starting linting",
+                            "endsPattern": "File change detected: end linting"
+                        }
+                    },
+                    {
                     "source": "pclint",
                     "owner": "cpp",
-                    "fileLocation":  "absolute",
-                    "pattern":{
-                        "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error|info)\\s+(.*)$",
+                        "fileLocation": "absolute",
+                        "pattern": {
+                            "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error)\\s+(.*)$",
                         "file": 1,
                         "line": 2,
                         "column": 3,
                         "severity": 4,
-                        "message": 5,
-                    }
-                }
+                            "message": 5
+                        },
+                        "background": {
+                            "activeOnStart": true,
+                            "beginsPattern": "File change detected: starting linting",
+                            "endsPattern": "File change detected: end linting"
+                        }
+                    },
+                ]
             }
         ]
     }
