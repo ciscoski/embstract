@@ -7,11 +7,25 @@
     },
     "configurePresets": [
         {
+            "name": "binary-dir",
+            "description": "Binary directory",
+            "binaryDir": "${sourceDir}/build/${presetName}/$env{EMBSTRACT_TOOLCHAIN}/$env{EMBSTRACT_BUILD_TYPE}/",
+            "hidden": true
+        },
+        {
+            "name": "export-compile-db",
+            "description": "Export Compile Database",
+            "hidden": true,
+            "cacheVariables": {
+                "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+            }
+        },
+        {
             "name": "debug",
             "description": "Debug build type",
             "hidden": true,
             "environment": {
-                "EMBSTRACTO_BUILD_TYPE": "debug"
+                "EMBSTRACT_BUILD_TYPE": "debug"
             },
             "cacheVariables":
             {
@@ -23,7 +37,7 @@
             "description": "Release build type",
             "hidden": true,
             "environment": {
-                "EMBSTRACTO_BUILD_TYPE": "rel"
+                "EMBSTRACT_BUILD_TYPE": "rel"
             },
             "cacheVariables":
             {

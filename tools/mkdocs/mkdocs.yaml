@@ -1,4 +1,4 @@
-site_name: EmbStracto
+site_name: EmbStract
 theme: readthedocs
 docs_dir: ../../../
 site_dir: ../../../build/docs

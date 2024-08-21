@@ -1,7 +1,7 @@
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.30)
 
-project(embstracto
-        DESCRIPTION "embstracto"
+project(embstract
+        DESCRIPTION "embstract"
         LANGUAGES C CXX ASM
         VERSION 0.0.0)
 
@@ -18,14 +18,6 @@ else()
     message(STATUS "Source directory: ${CMAKE_SOURCE_DIR}")
     message(STATUS "Binary directory: ${CMAKE_BINARY_DIR}")
 endif()
-
-execute_process(COMMAND  "python" "${CMAKE_SOURCE_DIR}/x.py" "${CMAKE_BINARY_DIR}")
-
-cmake_language(DEFER CALL execute_process COMMAND  "python" "${CMAKE_SOURCE_DIR}/x.py" "${CMAKE_BINARY_DIR}")
-cmake_language(DEFER ID_VAR id CALL message "Canceled Message")
-cmake_language(DEFER CANCEL_CALL ${id})
-message("Immediate Message")
-set(deferred_message "Deferred Message")
 
 include(${CMAKE_SCRIPTS_PATH}/build_options.cmake)
 

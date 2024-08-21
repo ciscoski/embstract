@@ -5,7 +5,7 @@
 Steps
 
 * Create a virtual environment
-* Install using `pip install -e D:\Dev\embstracto\tools\python\`
+* Install using `pip install -e D:\Dev\embstract\tools\python\`
 
 ## Linting
 

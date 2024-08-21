@@ -1,4 +1,4 @@
-## Contributing to EmbStracto
+## Contributing to embStract
 
 We welcome contributions! (See README.md: README.md for setup)
 

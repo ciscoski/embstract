@@ -1,5 +1,5 @@
 [project]
-name="embstracto-tools"
+name="embstract-tools"
 dynamic = ["version"]
 description = "All python scripts needed by the project."
 license = {file = "LICENSE"}

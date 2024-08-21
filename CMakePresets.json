@@ -1,23 +1,25 @@
 {
-  "version": 6,
+  "version": 9,
   "cmakeMinimumRequired": {
     "major": 3,
-    "minor": 25,
+    "minor": 30,
     "patch": 0
   },
   "include": [
-    "tools/build_env/cmake/toolchains/toolchain-presets.json",
-    "tools/build_env/cmake/scripts/emstracto-presets.json"
+    "tools/cmake/toolchains/toolchain-presets.json",
+    "tools/cmake/scripts/embstract-presets.json"
   ],
   "configurePresets": [
     {
-      "name": "Ciscoski",
+      "name": "hello_world-gcc-host-rel",
       "cacheVariables": {
         "TARGET": "hello_world"
       },
       "inherits": [
         "release",
-        "gcc-host"
+        "toolchain-gcc-host",
+        "export-compile-db",
+        "binary-dir"
       ],
       "generator": "Ninja",
       "vendor": {
