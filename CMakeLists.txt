@@ -5,8 +5,8 @@ project(embstracto
         LANGUAGES C CXX ASM
         VERSION 0.0.0)
 
-set(CMAKE_SCRIPTS_PATH ${CMAKE_CURRENT_SOURCE_DIR}/tools/build_env/cmake/scripts)
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/tools/build_env/cmake/modules)
+set(CMAKE_SCRIPTS_PATH ${CMAKE_CURRENT_SOURCE_DIR}/tools/cmake/scripts)
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/tools/cmake/modules)
 
 if (${CMAKE_BINARY_DIR} STREQUAL ${CMAKE_SOURCE_DIR})
     message(FATAL_ERROR "Source and build are in the same directory")

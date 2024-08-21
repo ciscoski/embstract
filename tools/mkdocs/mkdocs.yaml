@@ -6,7 +6,6 @@ site_dir: ../../../build/docs
 plugins:
   - search
   - same-dir
-  - with-pdf
 
 markdown_extensions:
   - extra

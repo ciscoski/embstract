@@ -7,6 +7,8 @@ This script will:
 2) Generate a PCLint project configuration file based on a filtered `compile_commands.json`.
 3) Invoke PCLint to analyze the requested files.
 
+The script can be run in one shot mode and in watch mode.
+
 This script assumes the following:
 * The CMake project (toolchain file) should specify `PCLINT_COMPILER_NAME`, which should be a compiler name present in the 
   PCLint `compilers.yaml` file.

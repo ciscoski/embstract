@@ -47,7 +47,8 @@
             "toolchainFile": "${sourceDir}/tools/build_env/cmake/toolchains/gcc-host.cmake",
             "environment": {
                 "EMBSTRACTO_TOOLCHAIN": "gcc-host"
-            }
+            },
+
         }
     ]
 }

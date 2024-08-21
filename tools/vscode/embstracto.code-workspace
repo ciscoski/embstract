@@ -1,7 +1,7 @@
 {
     "folders": [
         {
-            "path": "../../.."
+            "path": "../.."
         }
     ],
     "settings": {
@@ -17,7 +17,11 @@
             "-p=${command:cmake.buildDirectory}"
         ],
         "editor.formatOnSave": true,
-        "editor.formatOnSaveMode": "modificationsIfAvailable"
+        "editor.formatOnSaveMode": "modificationsIfAvailable",
+        "black-formatter.args": [
+            "--config",
+            "tools/black/black.toml"
+        ]
     },
     "tasks": {
         "version": "2.0.0",
@@ -48,15 +52,15 @@
                         }
                     },
                     {
-                    "source": "pclint",
-                    "owner": "cpp",
+                        "source": "pclint",
+                        "owner": "cpp",
                         "fileLocation": "absolute",
                         "pattern": {
                             "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error)\\s+(.*)$",
-                        "file": 1,
-                        "line": 2,
-                        "column": 3,
-                        "severity": 4,
+                            "file": 1,
+                            "line": 2,
+                            "column": 3,
+                            "severity": 4,
                             "message": 5
                         },
                         "background": {
