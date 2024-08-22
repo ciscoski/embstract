@@ -1,7 +1,7 @@
 site_name: EmbStract
 theme: readthedocs
-docs_dir: ../../../
-site_dir: ../../../build/docs
+docs_dir: ../../
+site_dir: ../../build/docs
 
 plugins:
   - search
