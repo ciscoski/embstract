@@ -19,7 +19,14 @@
         "black-formatter.args": [
             "--config",
             "tools/black/black.toml"
-        ]
+        ],
+        "isort.args": [
+            "--profile",
+            "black"
+        ],
+        "black-formatter.importStrategy": "fromEnvironment",
+        "isort.importStrategy": "fromEnvironment",
+        "isort.check": true,
     },
     "tasks": {
         "version": "2.0.0",
@@ -69,6 +76,16 @@
                     },
                 ]
             }
+        ]
+    },
+    "launch": {
+        "version": "0.2.0",
+        "configurations": []
+    },
+    "extensions": {
+        "recommendations": [
+            "ms-python.black-formatter",
+            "ms-python.isort"
         ]
     }
 }
