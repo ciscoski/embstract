@@ -23,7 +23,10 @@ nav:
   - README.md
   - docs/arch/architecture.md
   - Development :
-    - docs/dev/tools.md
+    - Tools: 
+      - Installation: docs/dev/tools.md
+      - tools/pclint/docs/run-pclint.md
+      - tools/clang_tidy/docs/run-clang-tidy.md
     - docs/dev/folder_structure.md
   - Contributing: 
     - License: LICENSE.md

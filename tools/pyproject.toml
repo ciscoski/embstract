@@ -10,18 +10,20 @@ dependencies = [
     "regex",
     "pyaml",
     "watchdog",
-    "black"
+    "black",
+    "jsonschema"
 ]
 requires-python = ">= 3.12"
 
 [build-system]
 requires = ["setuptools"]
 
-[tool.setuptools.packages.find]
-where = [".."]
-include = ["tools.clang_format","tools.clang_tidy", "tools.pclint"]
+[tool.setuptools.package-dir]
+clang_format = "clang_format"
+clang_tidy = "clang_tidy"
+pclint = "pclint"
 
 [project.scripts]
-run-clang-format="tools.clang_format.run_clang_format:main"
-run-clang-tidy="tools.clang_tidy.run_clang_tidy:main"
-run-pclint="tools.pclint.run_pclint:cli"
+run-clang-format="clang_format.run_clang_format:main"
+run-clang-tidy="clang_tidy.run_clang_tidy:main"
+run-pclint="pclint.run_pclint:cli"

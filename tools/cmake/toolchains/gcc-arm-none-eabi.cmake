@@ -38,4 +38,6 @@ function(assert_compiler_version)
     endif()
 endfunction()
 
-co
+# pclint settings
+set(PCLINT_COMPILER_NAME gcc CACHE STRING "The name of the compiler to be used by pclint.")
+set(PCLINT_COMPILER_BIN "${CMAKE_C_COMPILER}" CACHE STRING "Path to the compiler")

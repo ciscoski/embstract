@@ -27,7 +27,7 @@
             {
                 "label": "pclint",
                 "type": "shell",
-                "command": "run-pclint --build-path ${command:cmake.buildDirectory} watch ./tools/linting/pclint/std.lnt",
+                "command": "run-pclint --build-path ${command:cmake.buildDirectory} watch ./tools/pclint/config/std.lnt",
                 "isBackground": true,
                 "group": "none",
                 "problemMatcher": [

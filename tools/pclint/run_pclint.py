@@ -1,74 +1,78 @@
 #!/usr/bin/env python3
 """
-Wrapper to run PCLint as a pre-commit hook.
+Wrapper to run PCLint for development purposes.
 
 This script will:
-1) Extract the compiler type from the CMake build folder.
-2) Generate a PCLint project configuration file based on a filtered `compile_commands.json`.
+1) Extract the compiler configuration from a build rendered JSON file `pclint_compiler_config.json`
+2) Generate a PCLint project configuration file based on `compile_commands.json`.
 3) Invoke PCLint to analyze the requested files.
 
 The script can be run in one shot mode and in watch mode.
-
-This script assumes the following:
-* The CMake project (toolchain file) should specify `PCLINT_COMPILER_NAME`, which should be a compiler name present in the 
-  PCLint `compilers.yaml` file.
 """
 
 import json
+import logging
 import os
-import re
 import shutil
 import subprocess
-import tempfile
-import mmap
-from dataclasses import dataclass
-from typing import Pattern, Tuple
-import glob
-import logging
-from pprint import pformat
-import click
 import time
 from collections import defaultdict
-from watchdog.observers import Observer as WatchdogObserver
-from watchdog.observers.api import BaseObserver
-from watchdog.events import FileSystemEvent, PatternMatchingEventHandler
+from pprint import pformat
 from threading import Event
 
-CMAKE_COMPILE_COMMAND_FILE_NAME = "compile_commands.json"
-CMAKE_CACHE_FILE_NAME = "CMakeCache.txt"
-CMAKE_COMPILER_CACHE_FILE_NAME = "CMakeCCompiler.cmake"
+
+import click
+from jsonschema import validate as JSONvalidate
+from watchdog.events import FileSystemEvent, PatternMatchingEventHandler
+from watchdog.observers import Observer as WatchdogObserver
+from watchdog.observers.api import BaseObserver
+
+# CONSTANTS
+
+BUILD_COMPILE_COMMANDS_FILE_NAME = "compile_commands.json"
+BUILD_GENERATED_COMPILER_CONFIG_JSON_FILE_NAME = "pclint_compiler_config.json"
+BUILD_GENERATED_COMPILER_CONFIG_JSON_SCHEMA_FILE_NAME = "pclint_compiler_config.schema.json"
 
 PCLINT_CONFIG_SCRIPT_RELATIVE_PATH = "config/pclp_config.py"
+PCLINT_COMPILER_CONFIG_FILE_NAME = "pclint_compiler_config"
 PCLINT_LINTER_EXECUTABLE = "pclp64"
 PCLINT_OUTPUT_PATH = ".pclint"
-PCLINT_COMPILER_CONFIG_FILE_NAME = "pclint_compiler_config"
 PCLINT_PROJECT_CONFIG_FILE_NAME = "pclint_project_config.lnt"
 
-PCLINT_COMPILER_NAME_REGEX = re.compile(rb"PCLINT_COMPILER_NAME:.*=(.*)")
-PCLINT_COMPILER_OPTIONS_REGEX = re.compile(rb"PCLINT_COMPILER_OPTIONS:.*=(.*)")
-PCLINT_COMPILER_C_OPTIONS_REGEX = re.compile(rb"PCLINT_COMPILER_C_OPTIONS:.*=(.*)")
-PCLINT_COMPILER_CPP_OPTIONS_REGEX = re.compile(rb"PCLINT_COMPILER_CPP_OPTIONS:.*=(.*)")
-PCLINT_COMPILER_BIN = re.compile(rb"set\(CMAKE_C_COMPILER \"(.*)\"\)")
 
-event_file_changed = Event()
-build_files_changed = Event()
-
-
-class ProjectEventHandler(PatternMatchingEventHandler):
+class ProjectFilesEventHandler(PatternMatchingEventHandler):
     """
     Handles file system events related to project files. Triggers an event when a file is modified.
     """
 
+    def __init__(
+        self,
+        *,
+        event: Event,
+        patterns: list[str] | None = None,
+        ignore_patterns: list[str] | None = None,
+        ignore_directories: bool = False,
+        case_sensitive: bool = False,
+    ):
+        super().__init__(
+            patterns=patterns,
+            ignore_patterns=ignore_patterns,
+            ignore_directories=ignore_directories,
+            case_sensitive=case_sensitive,
+        )
+        self.event = event
+
     def on_modified(self, event):
         logging.debug("%s", event)
-        event_file_changed.set()
+        self.event.set()
 
     @classmethod
-    def schedule(cls, observer: BaseObserver, compile_command_file_path: os.PathLike) -> None:
+    def schedule(cls, observer: BaseObserver, event: Event, compile_command_file_path: os.PathLike) -> None:
         """
         Schedules the event handler for the specified files in the compile command database.
 
         :param observer: The observer to which the handler should be attached.
+        :param event: The event to trigger
         :param compile_command_file_path: Path to the `compile_commands.json` file.
         """
         with open(compile_command_file_path, "r") as compile_command_file:
@@ -83,19 +87,34 @@ class ProjectEventHandler(PatternMatchingEventHandler):
         logging.debug("Scheduling the following files\n%s", pformat(dict(collection)))
 
         for folder_path, patterns in collection.items():
-            observer.schedule(cls(patterns, ignore_directories=True), folder_path)
+            event_handler = cls(event=event, patterns=patterns, ignore_directories=True)
+            observer.schedule(event_handler, folder_path)
 
 
-class BuildPathEventHandler(PatternMatchingEventHandler):
+class BuildFilesEventHandler(PatternMatchingEventHandler):
     """
     Handles file system events related to build path files. Triggers an event when build-related files are created, modified, or deleted.
     """
 
-    def __init__(self, build_path: os.PathLike):
+    def __init__(
+        self,
+        *,
+        event: Event,
+        build_path: os.PathLike,
+        patterns: list[str] | None = None,
+        ignore_patterns: list[str] | None = None,
+        ignore_directories: bool = False,
+        case_sensitive: bool = False,
+    ):
         super().__init__(
-            patterns=[CMAKE_COMPILE_COMMAND_FILE_NAME, CMAKE_CACHE_FILE_NAME, CMAKE_COMPILER_CACHE_FILE_NAME],
+            patterns=patterns,
+            ignore_patterns=ignore_patterns,
+            ignore_directories=ignore_directories,
+            case_sensitive=case_sensitive,
         )
+
         self.build_path = build_path
+        self.event = event
 
     def _check_if_ready(self) -> bool:
         """
@@ -103,14 +122,11 @@ class BuildPathEventHandler(PatternMatchingEventHandler):
 
         :return: True if all required files are present, False otherwise.
         """
-        compile_command_exists = os.path.exists(os.path.join(self.build_path, CMAKE_COMPILE_COMMAND_FILE_NAME))
-        cache_file_exists = os.path.exists(os.path.join(self.build_path, CMAKE_CACHE_FILE_NAME))
-        compiler_cache_file_exists = (
-            True
-            if len(glob.glob(f"{self.build_path}/**/{CMAKE_COMPILER_CACHE_FILE_NAME}", recursive=True)) > 0
-            else False
+        compile_command_exists = os.path.exists(os.path.join(self.build_path, BUILD_COMPILE_COMMANDS_FILE_NAME))
+        compiler_configuration_exists = os.path.exists(
+            os.path.join(self.build_path, BUILD_GENERATED_COMPILER_CONFIG_JSON_FILE_NAME)
         )
-        return compile_command_exists and cache_file_exists and compiler_cache_file_exists
+        return compile_command_exists and compiler_configuration_exists
 
     def on_deleted(self, event: FileSystemEvent) -> None:
         logging.debug("%s", event)
@@ -119,200 +135,209 @@ class BuildPathEventHandler(PatternMatchingEventHandler):
     def on_created(self, event: FileSystemEvent) -> None:
         logging.debug("%s", event)
         if self._check_if_ready():
-            build_files_changed.set()
+            self.event.set()
 
     def on_modified(self, event: FileSystemEvent) -> None:
         logging.debug("%s", event)
         if self._check_if_ready():
-            build_files_changed.set()
+            self.event.set()
 
     @classmethod
-    def schedule(cls, observer: BaseObserver, build_path: os.PathLike) -> None:
+    def schedule(cls, observer: BaseObserver, event: Event, build_path: os.PathLike) -> None:
         """
         Schedules the event handler for build-related files.
 
         :param observer: The observer to which the handler should be attached.
+        :param event: The event to trigger
         :param build_path: Path to the build directory.
         """
-        event_handler = cls(build_path)
-        observer.schedule(event_handler, build_path, recursive=True)
+        event_handler = cls(
+            event=event,
+            build_path=build_path,
+            patterns=[BUILD_COMPILE_COMMANDS_FILE_NAME, BUILD_GENERATED_COMPILER_CONFIG_JSON_FILE_NAME],
+            ignore_directories=True,
+        )
+        observer.schedule(event_handler, build_path)
 
 
-@dataclass
-class PclingCachedVariable:
-    """
-    Dataclass to store PCLint cached variables.
-    """
+class RunPCLint:
+    def __init__(
+        self,
+        pclint_output_path: os.PathLike,
+        pcpl_config_path: os.PathLike,
+        build_path: os.PathLike,
+        pclint_path: os.path,
+    ):
+        self.pclint_output_path = pclint_output_path
+        self.pcpl_config_path = pcpl_config_path
+        self.build_path = build_path
+        self.pclint_path = pclint_path
 
-    regex: Pattern[bytes]
-    required: bool
-    value: str | None = None
+    def extract_and_validate_compiler_configuration_from_build(self) -> dict[str, str]:
+        # open schema
+        compiler_config_schema_file_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), BUILD_GENERATED_COMPILER_CONFIG_JSON_SCHEMA_FILE_NAME
+        )
+        with open(compiler_config_schema_file_path, "r") as compiler_config_schema_file:
+            compiler_configuration_schema = json.load(compiler_config_schema_file)
 
+        # open configuration
+        compiler_config_file_path = os.path.join(self.build_path, BUILD_GENERATED_COMPILER_CONFIG_JSON_FILE_NAME)
+        with open(compiler_config_file_path, "r") as pclint_compiler_config_file:
+            compiler_configuration: dict = json.load(pclint_compiler_config_file)
 
-def extract_compiler_name_from_build(build_path: os.PathLike) -> dict[str, PclingCachedVariable]:
-    """
-    Extracts the compiler name and related configuration from the CMake cache files.
+        # validate configuration
+        JSONvalidate(compiler_configuration, compiler_configuration_schema)
 
-    :param build_path: Path to the build directory.
-    :return: Dictionary containing the compiler configuration variables.
-    :raises ValueError: If required configuration variables are not found.
-    """
-    logging.debug("Extracting compiler from build")
-    pclint_compiler_configs: dict[str, PclingCachedVariable] = {
-        "compiler": PclingCachedVariable(PCLINT_COMPILER_NAME_REGEX, True),
-        "compiler-options": PclingCachedVariable(PCLINT_COMPILER_OPTIONS_REGEX, False),
-        "compiler-c-options": PclingCachedVariable(PCLINT_COMPILER_C_OPTIONS_REGEX, False),
-        "compiler-cpp-options": PclingCachedVariable(PCLINT_COMPILER_CPP_OPTIONS_REGEX, False),
-    }
+        return compiler_configuration
 
-    with open(os.path.join(build_path, CMAKE_CACHE_FILE_NAME), "r+") as cache_file:
-        data = mmap.mmap(cache_file.fileno(), 0)
-        for pclint_compiler_config in pclint_compiler_configs.values():
-            match = pclint_compiler_config.regex.search(data)
-            if pclint_compiler_config.required is True and match is None:
-                raise ValueError(
-                    f"Could not find {pclint_compiler_config.regex} in the build cache file. This should be assigned."
-                )
-            elif pclint_compiler_config.required is False and match is None:
-                pass
-            else:
-                pclint_compiler_config.value = match.group(1).decode("utf-8").rstrip()
+    def build_pclint_compiler_configuration(
+        self,
+        compiler_configuration: dict[str, str],
+    ) -> str:
+        logging.debug("Compiler configuration")
+        pclint_compiler_config_cl = [f"--{key}={value}" for key, value in compiler_configuration.items() if value != ""]
+        output_lint_file = os.path.join(self.pclint_output_path, PCLINT_COMPILER_CONFIG_FILE_NAME + ".lnt")
+        output_header_file = os.path.join(self.pclint_output_path, PCLINT_COMPILER_CONFIG_FILE_NAME + ".h")
+        subprocess.run(
+            [
+                "python",
+                self.pcpl_config_path,
+                *pclint_compiler_config_cl,
+                "--generate-compiler-config",
+                f"--config-output-lnt-file={output_lint_file}",
+                f"--config-output-header-file={output_header_file}",
+            ],
+            shell=True,
+            check=True,
+            stderr=subprocess.DEVNULL,
+        )
 
-    cmake_C_compiler_def_files = glob.glob(f"{build_path}/**/{CMAKE_COMPILER_CACHE_FILE_NAME}", recursive=True)
-    if len(cmake_C_compiler_def_files) != 1:
-        raise ValueError(f"Only one {CMAKE_COMPILER_CACHE_FILE_NAME} can exist in the build directory,")
+        logging.debug("Compiler Configuration created in %s", output_lint_file)
+        return output_lint_file
 
-    with open(cmake_C_compiler_def_files[0], "r+") as c_compiler_definition_file:
-        data = mmap.mmap(c_compiler_definition_file.fileno(), 0)
-        match = PCLINT_COMPILER_BIN.search(data)
-        if match is None:
-            raise ValueError("Could not find C compiler path.")
-        else:
-            pclint_compiler_configs["compiler-bin"] = PclingCachedVariable(
-                PCLINT_COMPILER_BIN,
-                True,
-                match.group(1).decode("utf-8").rstrip(),
-            )
+    def build_pclint_project_configuration(
+        self,
+        compiler_configuration: dict[str, str],
+    ) -> str:
+        logging.debug("Project configuration")
+        compiler = compiler_configuration["compiler"]
+        project_config_file_path = os.path.join(self.pclint_output_path, PCLINT_PROJECT_CONFIG_FILE_NAME)
+        compile_command_file_path = os.path.join(self.build_path, BUILD_COMPILE_COMMANDS_FILE_NAME)
 
-    logging.debug(
-        "Compiler information extracted from build: \n%s",
-        pformat({key: val.value for key, val in pclint_compiler_configs.items()}),
-    )
+        subprocess.run(
+            [
+                "python",
+                self.pcpl_config_path,
+                f"--compiler={compiler}",
+                f"--compilation-db={compile_command_file_path}",
+                f"--config-output-lnt-file={project_config_file_path}",
+                "--generate-project-config",
+            ],
+            shell=True,
+            check=True,
+            stderr=subprocess.DEVNULL,
+        )
 
-    return pclint_compiler_configs
+        logging.debug("Project Configuration created in %s", project_config_file_path)
 
+        return project_config_file_path
 
-def build_pclint_compiler_configuration(
-    pclint_compiler_configs: dict[str, PclingCachedVariable],
-    pclint_output_path: str,
-    pcpl_config_path: str,
-) -> str:
-    """
-    Builds the PCLint compiler configuration file.
+    def prepare_pclint_execution_enviornment(self) -> dict[str, str]:
+        # extract compiler configuration
+        compiler_configuration = self.extract_and_validate_compiler_configuration_from_build()
 
-    :param pclint_compiler_configs: Dictionary containing compiler configuration variables.
-    :param pclint_output_path: Path to store the PCLint output.
-    :param pcpl_config_path: Path to the PCLint configuration script.
-    :return: Path to the generated PCLint compiler configuration file.
-    """
-    logging.debug("Compiler configuration")
-    pclint_compiler_config_cl = [
-        f"--{key}={config.value}" for key, config in pclint_compiler_configs.items() if config.value is not None
-    ]
-    output_lint_file = os.path.join(pclint_output_path, PCLINT_COMPILER_CONFIG_FILE_NAME + ".lnt")
-    output_header_file = os.path.join(pclint_output_path, PCLINT_COMPILER_CONFIG_FILE_NAME + ".h")
-    subprocess.run(
-        [
-            "python",
-            pcpl_config_path,
-            *pclint_compiler_config_cl,
-            "--generate-compiler-config",
-            f"--config-output-lnt-file={output_lint_file}",
-            f"--config-output-header-file={output_header_file}",
-        ],
-        shell=True,
-        check=True,
-        stderr=subprocess.DEVNULL,
-    )
+        # build pclint compiler configuration
+        compiler_config_file_path = self.build_pclint_compiler_configuration(compiler_configuration)
 
-    logging.debug("Compiler Configuration created in %s", output_lint_file)
-    return output_lint_file
+        # extract project configuration
+        project_config_file_path = self.build_pclint_project_configuration(compiler_configuration)
 
+        pclint_lnt_path = os.path.abspath(os.path.join(self.pclint_path, "lnt"))
+        pclint_tooling_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "config")
 
-def build_pclint_project_configuration(
-    project_files: list[str] | None,
-    compiler_name: str,
-    build_path: str,
-    pclint_output_path: str,
-    pcpl_config_path: str,
-) -> Tuple[str, str | None]:
-    """
-    Builds the PCLint project configuration file.
+        env = os.environ.copy()
+        env["PCLINT_COMPILER_FILE_PATH"] = compiler_config_file_path
+        env["PCLINT_PROJECT_FILE_PATH"] = project_config_file_path
+        env["PCLINT_LNT_PATH"] = pclint_lnt_path
+        env["PCLINT_TOOLING_PATH"] = pclint_tooling_path
 
-    :param project_files: List of project files to include in the configuration.
-    :param compiler_name: Name of the compiler.
-    :param build_path: Path to the build directory.
-    :param pclint_output_path: Path to store the PCLint output.
-    :param pcpl_config_path: Path to the PCLint configuration script.
-    :return: Tuple containing the path to the generated project configuration file and the compiler options.
-    """
-    logging.debug("Project configuration")
-    project_config_file_path = os.path.join(pclint_output_path, PCLINT_PROJECT_CONFIG_FILE_NAME)
-    compile_command_file_path = os.path.join(build_path, CMAKE_COMPILE_COMMAND_FILE_NAME)
+        return env
 
-    if project_files is not None:
-        temporary_file = True
-        # generates a temporary compile_command file because somehow
-        # --source-pattern does not work in pclp_config.py
-        filter = re.compile("|".join([re.escape(x) for x in project_files]))
+    def execute_pclint(
+        self,
+        args: list[str],
+        env: dict[str, str],
+    ) -> int:
+        logging.debug("Running PCLint")
+        pcpl64_path = os.path.abspath(os.path.join(self.pclint_path, PCLINT_LINTER_EXECUTABLE))
+        cmd = [pcpl64_path, *args]
+        logging.debug("invoking: \n%s", pformat(cmd))
+        r = subprocess.run(cmd, shell=True, env=env)
+        return r.returncode
 
-        with tempfile.NamedTemporaryFile(mode="w", delete=False) as command_filter_file:
-            with open(compile_command_file_path) as compile_command_file:
-                compile_commands = json.load(compile_command_file)
-                filtered_commands = [s for s in compile_commands if filter.match(s["file"])]
-                json.dump(filtered_commands, command_filter_file)
-                compile_command_file_path_temp = command_filter_file.name
-    else:
-        temporary_file = False
-        compile_command_file_path_temp = compile_command_file_path
+    def lint(
+        self,
+        pclint_args: list[str],
+    ) -> int:
+        env = self.prepare_pclint_execution_enviornment()
+        exec_return = self.execute_pclint(pclint_args, env)
+        return exec_return
 
-    subprocess.run(
-        [
-            "python",
-            pcpl_config_path,
-            f"--compiler={compiler_name}",
-            f"--compilation-db={compile_command_file_path_temp}",
-            f"--config-output-lnt-file={project_config_file_path}",
-            "--generate-project-config",
-        ],
-        shell=True,
-        check=True,
-        stderr=subprocess.DEVNULL,
-    )
+    def watch(
+        self,
+        throttle: int,
+        pclint_args: list[str],
+    ) -> int:
 
-    if project_files is not None:
-        os.remove(compile_command_file_path_temp)
+        project_files_changed_event = Event()
+        build_files_changed_event = Event()
 
-    logging.debug("Project Configuration created in %s", project_config_file_path)
+        ret_val: int = 0
+        compile_command_file_path = os.path.join(self.build_path, BUILD_COMPILE_COMMANDS_FILE_NAME)
 
-    return project_config_file_path
+        # clear file change events
+        project_files_changed_event.clear()
+        build_files_changed_event.set()
 
+        # Start the File Watchdog
+        watchdog_observer = WatchdogObserver()
+        watchdog_observer.start()
 
-def execute_pclint(pclint_path: str, args: list[str], env: dict[str, str]) -> int:
-    """
-    Executes the PCLint linter with the specified arguments and environment.
+        try:
+            while True:
+                if build_files_changed_event.is_set():
+                    build_files_changed_event.clear()
 
-    :param pclint_path: Path to the PCLint executable.
-    :param args: List of arguments to pass to PCLint.
-    :param env: Environment variables for the PCLint execution.
-    :return: Exit code from the PCLint process.
-    """
-    logging.debug("Running PCLint")
-    pcpl64_path = os.path.abspath(os.path.join(pclint_path, PCLINT_LINTER_EXECUTABLE))
-    cmd = [pcpl64_path, *args]
-    logging.debug("invoking: \n%s", pformat(cmd))
-    r = subprocess.run(cmd, shell=True, env=env)
-    return r.returncode
+                    env = self.prepare_pclint_execution_enviornment()
+
+                    # remove all listener
+                    watchdog_observer.unschedule_all()
+
+                    BuildFilesEventHandler.schedule(watchdog_observer, build_files_changed_event, self.build_path)
+                    ProjectFilesEventHandler.schedule(
+                        watchdog_observer, project_files_changed_event, compile_command_file_path
+                    )
+
+                    project_files_changed_event.set()
+
+                elif project_files_changed_event.is_set():
+                    click.echo("File change detected: starting linting")
+                    project_files_changed_event.clear()
+                    self.execute_pclint(pclint_args, env)
+                    click.echo("File change detected: end linting")
+
+                time.sleep(throttle)
+        except KeyboardInterrupt:
+            logging.info("Interrupted by Keyboard interrupt")
+        except Exception as exception:
+            logging.exception(exception)
+            ret_val = 1
+        finally:
+            watchdog_observer.stop()
+
+        watchdog_observer.join()
+        return ret_val
 
 
 @click.group()
@@ -336,166 +361,52 @@ def execute_pclint(pclint_path: str, args: list[str], env: dict[str, str]) -> in
     help="Path to a folder containg a compile command database",
 )
 @click.pass_context
-def cli(ctx, log_level, pclint_path, build_path):
-    """
-    Main command group for setting up and managing PCLint configurations.
-    """
-    ctx.ensure_object(dict)
-
+def cli(ctx: click.Context, log_level: str, pclint_path: os.PathLike, build_path: os.PathLike):
     # setup logging
     logging.basicConfig(level=getattr(logging, log_level))
 
     # Find path for PCLint config script
     pcpl_config_path = os.path.abspath(os.path.join(pclint_path, PCLINT_CONFIG_SCRIPT_RELATIVE_PATH))
     if not os.path.isfile(pcpl_config_path):
-        raise FileNotFoundError(f"Could not find pcpl_config in {pclint_path}")
+        raise FileNotFoundError(f"Could not find pcpl_config.py in {pclint_path}")
 
     # Create PCLint confguration output folder
     pclint_output_path = os.path.join(build_path, PCLINT_OUTPUT_PATH)
     if not os.path.exists(pclint_output_path):
         os.mkdir(pclint_output_path)
 
-    ctx.obj["pclint_output_path"] = pclint_output_path
-    ctx.obj["pcpl_config_path"] = pcpl_config_path
-    ctx.obj["build_path"] = build_path
-    ctx.obj["pclint_path"] = pclint_path
+    ctx.obj = RunPCLint(pclint_output_path, pcpl_config_path, build_path, pclint_path)
 
 
-@cli.command()
+@cli.command(name="watch")
 @click.option(
     "--throttle",
     type=float,
     default=1,
     help="Time (in seconds) to wait between file change event and linting execution",
 )
-@click.option(
-    "--restart-on-change",
-    type=bool,
-    default=False,
-    help="If a file changes while the linter is running the process is stopped and restarted",
-)
 @click.argument("pclint_args", nargs=-1, type=click.UNPROCESSED)
 @click.pass_context
-def watch(ctx, throttle, restart_on_change, pclint_args):
+def cli_watch(ctx: click.Context, throttle: float, pclint_args: list[str]) -> int:
     """
-    Command to watch for file changes and run PCLint accordingly.
-
-    :param build_path: Path to the build directory.
+    Watch the project files and run the linter everytime a file changes.
     """
-    pclint_output_path = ctx.obj["pclint_output_path"]
-    pcpl_config_path = ctx.obj["pcpl_config_path"]
-    build_path = ctx.obj["build_path"]
-    pclint_path = ctx.obj["pclint_path"]
-
-    compile_command_file_path = os.path.join(build_path, CMAKE_COMPILE_COMMAND_FILE_NAME)
-
-    # clear file change events
-    event_file_changed.clear()
-    build_files_changed.set()
-
-    # Start the File Watchdog
-    watchdog_observer = WatchdogObserver()
-    watchdog_observer.start()
-
-    # Schedule an Handler for the CMake configured files
-    BuildPathEventHandler.schedule(watchdog_observer, build_path)
-
-    try:
-        while True:
-            if build_files_changed.is_set():
-                build_files_changed.clear()
-
-                # extract compiler configuration
-                compiler_configuration = extract_compiler_name_from_build(build_path)
-                compiler_config_file_path = build_pclint_compiler_configuration(
-                    compiler_configuration, pclint_output_path, pcpl_config_path
-                )
-
-                # extract project configuration
-                project_config_file_path = build_pclint_project_configuration(
-                    [],
-                    compiler_configuration["compiler"].value,
-                    build_path,
-                    pclint_output_path,
-                    pcpl_config_path,
-                )
-
-                # prepare enviornment
-                pclint_tooling_path = os.path.dirname(os.path.realpath(__file__))
-                pclint_lnt_path = os.path.abspath(os.path.join(pclint_path, "lnt"))
-
-                env = os.environ.copy()
-                env["PCLINT_LNT_PATH"] = pclint_lnt_path
-                env["PCLINT_TOOLING_PATH"] = pclint_tooling_path
-                env["PCLINT_COMPILER_FILE_PATH"] = compiler_config_file_path
-                env["PCLINT_PROJECT_FILE_PATH"] = project_config_file_path
-
-                # remove all listener
-                watchdog_observer.unschedule_all()
-
-                BuildPathEventHandler.schedule(watchdog_observer, build_path)
-                ProjectEventHandler.schedule(watchdog_observer, compile_command_file_path)
-
-                event_file_changed.set()
-
-            elif event_file_changed.is_set():
-                click.echo("File change detected: starting linting")
-                event_file_changed.clear()
-                execute_pclint(pclint_path, pclint_args, env)
-                click.echo("File change detected: end linting")
-
-            time.sleep(throttle)
-    except KeyboardInterrupt:
-        logging.info("Interrupted by Keyboard interrupt")
-    except Exception as exception:
-        logging.warning(exception)
-    finally:
-        watchdog_observer.stop()
-    watchdog_observer.join()
+    if not isinstance(ctx.obj, RunPCLint):
+        raise TypeError("The conect object is not an instance of RunPCLint")
+    return ctx.obj.watch(throttle, pclint_args)
 
 
-@cli.command()
+@cli.command(name="lint")
 @click.pass_context
 @click.argument("pclint_args", nargs=-1, type=click.UNPROCESSED)
-def lint(ctx, pclint_args):
+def cli_lint(ctx: click.Context, pclint_args: list[str]) -> int:
     """
-    Command to run PCLint on the specified files.
-
-    :param files: List of files to analyze with PCLint.
-    :param build_path: Path to the build directory.
+    Lint the project.
     """
-    pclint_output_path = ctx.obj["pclint_output_path"]
-    pcpl_config_path = ctx.obj["pcpl_config_path"]
-    build_path = ctx.obj["build_path"]
-    pclint_path = ctx.obj["pclint_path"]
-
-    # extract compiler configuration
-    compiler_configuration = extract_compiler_name_from_build(build_path)
-    compiler_config_file_path = build_pclint_compiler_configuration(
-        compiler_configuration, pclint_output_path, pcpl_config_path
-    )
-
-    # extract project configuration
-    project_config_file_path = build_pclint_project_configuration(
-        [],
-        compiler_configuration["compiler"].value,
-        build_path,
-        pclint_output_path,
-        pcpl_config_path,
-    )
-
-    pclint_tooling_path = os.path.dirname(os.path.realpath(__file__))
-    pclint_lnt_path = os.path.abspath(os.path.join(pclint_path, "lnt"))
-
-    env = os.environ.copy()
-    env["PCLINT_LNT_PATH"] = pclint_lnt_path
-    env["PCLINT_TOOLING_PATH"] = pclint_tooling_path
-    env["PCLINT_COMPILER_FILE_PATH"] = compiler_config_file_path
-    env["PCLINT_PROJECT_FILE_PATH"] = project_config_file_path
-
-    exec_return = execute_pclint(pclint_path, pclint_args, env)
-    return exec_return
+    if not isinstance(ctx.obj, RunPCLint):
+        raise TypeError("The conect object is not an instance of RunPCLint")
+    return ctx.obj.lint(pclint_args)
 
 
 if __name__ == "__main__":
-    cli(obj={})
+    cli()

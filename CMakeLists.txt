@@ -53,3 +53,8 @@ IF(IS_DIRECTORY ${dir})
 ELSE()
     message(WARNING "Target ${TARGET} could not be found.")
 ENDIF()
+
+# PCLint Compiler Configuration
+set(PCLINT_HELPER_SCRIPT_PATH ${CMAKE_SOURCE_DIR}/tools/pclint/cmake)
+include(${PCLINT_HELPER_SCRIPT_PATH}/pclint_helper.cmake)
+generate_pclint_compiler_config()

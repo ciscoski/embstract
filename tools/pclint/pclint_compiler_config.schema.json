@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PCLint Compiler Configuration",
+  "type": "object",
+  "properties": {
+    "compiler": { "type": "string" , "description": "The compiler name as specified in `pclp_config.py' --list-compiler`"},
+    "compiler-options": { "type": "string", "description": "A space separated list of base compiler options. If you are targeting an architecture other than the compiler’s default, you should include the option that specifies the target architecture when generating a compiler configuration to ensure the correct values for size options in the generated configuration. Compiler options specified with this option are applied when the compiler is invoked in either C or C++ mode."},
+    "compiler-c-options": {"type": "string", "description": "Similar to `compiler-options` but only used when invoking the compiler in C mode. Use for C-only language options such as setting the language version."},
+    "compiler-cpp-options": {"type": "string", "description": "Similar to `compiler-options` but only used when invoking the compiler in C++ mode. Use for C++-only language options such as setting the language version."},
+    "compiler-bin": {"type": "string", "description": "Compiler bin path."}
+  },
+  "additionalProperties": false,
+  "required": ["compiler", "compiler-bin"]
+}

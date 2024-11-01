@@ -1,0 +1,7 @@
+{
+    "compiler" : "@PCLINT_COMPILER_NAME@",
+    "compiler-options" : "@PCLINT_COMPILER_OPTIONS@",
+    "compiler-c-options" : "@PCLINT_COMPILER_C_OPTIONS@",
+    "compiler-cpp-options" : "@PCLINT_COMPILER_CPP_OPTIONS@",
+    "compiler-bin" : "@PCLINT_COMPILER_BIN@"
+}
