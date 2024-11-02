@@ -6,6 +6,10 @@ site_dir: ../../build/docs
 plugins:
   - search
   - same-dir
+  - mkdocstrings:
+      handlers: 
+        python:
+          paths: [../clang_format/run_clang_format.py]
 
 markdown_extensions:
   - extra
@@ -25,8 +29,9 @@ nav:
   - Development :
     - Tools: 
       - Installation: docs/dev/tools.md
-      - tools/pclint/docs/run-pclint.md
-      - tools/clang_tidy/docs/run-clang-tidy.md
+      - tools/pclint/docs/pclint.md
+      - tools/clang_format/docs/clang_format.md
+      - tools/clang_tidy/docs/clang_tidy.md
     - docs/dev/folder_structure.md
   - Contributing: 
     - License: LICENSE.md
