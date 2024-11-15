@@ -98,7 +98,7 @@ A CMake user can include the `pclint_helper.cmake` script to generate compiler c
 
 ```cmake
 # PCLint Compiler Configuration
-set(PCLINT_HELPER_SCRIPT_PATH ${CMAKE_SOURCE_DIR}/tools/pclint/cmake)
+set(PCLINT_HELPER_SCRIPT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/tools/pclint/cmake)
 include(${PCLINT_HELPER_SCRIPT_PATH}/pclint_helper.cmake)
 generate_pclint_compiler_config()
 ```
