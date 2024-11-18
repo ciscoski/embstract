@@ -6,18 +6,18 @@
 
 /***********************************************************************************************************************
  * @file
- * @brief Breaf description
- * 
- * Lorem ipsum dolor sit amet, consectetur adipiscing elit,  sed do eiusmod tempor incididunt ut labore et dolore 
- * magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo 
- * consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. 
+ * @brief Brief description
+ *
+ * Lorem ipsum dolor sit amet, consectetur adipiscing elit,  sed do eiusmod tempor incididunt ut labore et dolore
+ * magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo
+ * consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.
  * Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
- * 
+ *
  **********************************************************************************************************************/
 
 /* Include Guard */
-#ifndef FILE_NAME_H
-#define FILE_NAME_H
+#ifndef MODULE_NAME_PRIVATE_API_H
+#define MODULE_NAME_PRIVATE_API_H
 
 /* C++ Support */
 #if defined(__cplusplus)
