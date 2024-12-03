@@ -1,31 +1,18 @@
 #include <iostream>
 
-#define TEST_THIS_ONE_P
+#include <embs_log/levels.h>
 
-using Ciao = int;
+#define EMBS_LOG_MODULE_NAME "ciscoski"
+#define EMBS_LOG_LEVEL       EMBS_LOG_LEVEL_DEBUG
 
-/// @brief Ciao mondo !
-/// @param x
-void Foo(int tTest)
-{
-    int buf[10];
-    if (tTest == 1000)
-        buf[tTest] = 0; // <- ERROR
-}
+#include <embs_log/log.h>
+#include <expl_greatings_localization/expl_greatings_localization.h>
 
-#ifdef NDEBUG
-/// @brief Cisco is the best
-void Csisco()
-{
-    std::cout << "Cisco";
-}
-#endif
-
-/// @brief Main entry point
-/// @return always 0
 auto main() -> int
 {
-    Foo(10);
-    std::cout << "Hello World!";
+    uint8_t greetings[50];
+    greetings_message(greetings, sizeof(greetings));
+    EMBS_LOG_INFO("%s %d", greetings, 10);
+    EMBS_LOG_DEBUG("%s %d", EXPL_GREATINGS_LOCALIZATION_GREETINGS_MESSAGE, 11);
     return 0;
 }
