@@ -11,12 +11,12 @@
   ],
   "configurePresets": [
     {
-      "name": "hello_world-gcc-host-rel",
+      "name": "hello_world",
       "cacheVariables": {
         "TARGET": "hello_world"
       },
       "inherits": [
-        "release",
+        "debug",
         "toolchain-gcc-host",
         "export-compile-db",
         "binary-dir"
