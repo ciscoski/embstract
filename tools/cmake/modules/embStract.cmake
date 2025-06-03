@@ -271,12 +271,12 @@ define_property(
 
 function(embs_set_config_target target config_target)
     get_target_property(
-        faced_frontend_target
+        facede_frontend_target
         ${target}
         EMBS_FACADE_FRONTEND_TARGET
     )
 
-    if(faced_frontend_target)
+    if(facede_frontend_target)
         message(
             FATAL_ERROR
             "${target} is a facade library, the front-end is used as configuration target"
@@ -305,13 +305,13 @@ endfunction()
 # if not it return the set target or the target itself if no configuration target is set
 macro(embs_get_config_target config_target target)
     get_target_property(
-        faced_frontend_target
+        facede_frontend_target
         ${target}
         EMBS_FACADE_FRONTEND_TARGET
     )
 
-    if(faced_frontend_target)
-        set(${config_target} ${faced_frontend_target})
+    if(facede_frontend_target)
+        set(${config_target} ${facede_frontend_target})
     else()
         get_target_property(config_target_property ${target} EMBS_CONFIG_TARGET)
 
